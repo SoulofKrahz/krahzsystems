@@ -1,0 +1,49 @@
+# Publica la carpeta site/ en Cloudflare Pages al subir cambios a main.
+# Secretos en GitHub (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN  (token con permiso Account → Cloudflare Pages → Edit)
+#   CLOUDFLARE_ACCOUNT_ID (ID de la cuenta de Cloudflare)
+# Variable opcional (pestaña Variables): CF_PROJECT = nombre del proyecto de Pages (por defecto: krahzsystems).
+# Si el proyecto de Pages no existe, se crea solo en la primera publicación.
+name: Publicar en Cloudflare Pages
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/deploy.yml']
+  workflow_dispatch:
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+jobs:
+  deploy:
+    name: Comprobar y publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      deployments: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_PROJECT: ${{ vars.CF_PROJECT || 'krahzsystems' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Comprobar que existen los secretos
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Falta el secreto CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Falta el secreto CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+      - name: Comprobar la web (index.html e iconos referenciados)
+        run: |
+          test -s site/index.html
+          for f in $(grep -o 'ic/[a-z0-9-]*\.png' site/index.html | sort -u); do test -s "site/$f" || { echo "Falta site/$f"; exit 1; }; done
+      - name: Crear el proyecto de Pages si no existe
+        run: |
+          if npx -y wrangler@4 pages project list | grep -qw "$CF_PROJECT"; then
+            echo "El proyecto $CF_PROJECT ya existe"
+          else
+            npx -y wrangler@4 pages project create "$CF_PROJECT" --production-branch=main
+          fi
+      - name: Publicar
+        run: npx -y wrangler@4 pages deploy site --project-name="$CF_PROJECT" --branch=main --commit-dirty=true
