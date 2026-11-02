@@ -1,6 +1,6 @@
 # Krahz Systems
 
-Página índice de las webapps personales de Krahz (Noticiahz, Caravanahz, Mediaskinhz).
+Página índice de las webapps personales de Krahz (Noticiahz, Caravanahz, Mediaskinhz, Rutahz).
 La web está en `site/` (un solo `index.html`, sin build) y se publica sola en Cloudflare Pages
 al subir cambios a la rama `main` (ver `.github/workflows/deploy.yml`).
 
